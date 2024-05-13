@@ -3,8 +3,6 @@
 	.eqv	BYTES_PER_ROW 960
 	.eqv	IMAGE_WIDTH 320
 	.eqv	IMAGE_HEIGHT 240
-	.eqv	BLACK 0x00000000
-	.eqv	WHITE 0x00FFFFFF
 
 	.data
 # space for the  320x240 bmp image
@@ -13,16 +11,68 @@
 result:	.space	2
 
 image:	.space	BMP_FILE_SIZE
-fname:	.asciz	"ex.bmp"
+#fname:	.asciz	"example_markers.bmp"
+fname:	.space	100
 
 	.text
 main:
+	la	a0, fname
+	jal	read_fname
+	la	a0, fname
+	jal	edit_fname
 	jal	read_bmp
 	jal 	process_image
 
 exit:
 	li 	a7, 10
 	ecall
+# ============================================================================
+read_fname:
+#description: 
+#	reads file name from standard input
+#arguments:
+#	a0 - container for name
+#return value:
+#	none
+
+	addi	sp, sp, -4
+	sw	ra, 0(sp)
+	
+
+	li	a7, 8      # Kod syscall dla "read"
+    	li	a1, 100     # Maksymalna długość nazwy pliku
+    	ecall
+
+	addi	sp, sp, 4
+	jr	ra
+# ============================================================================
+edit_fname:
+#description: 
+#	replaces newline character ('\n') with end of string character '\0'
+#arguments:
+#	a0 - container for name
+#return value:
+#	none
+	addi	sp, sp, -4
+	sw	ra, 0(sp)
+	
+	li	t2, 10
+	la t0,	fname      # Adres początkowy ciągu znaków
+edit_fname_loop:
+	lbu	t1, 0(t0)  # Wczytaj kolejny znak
+	beqz	t1, edit_fname_done   # Jeśli znak to 0, zakończ pętlę
+	beq	t1, t2, edit_fname_replace # Jeśli znak to '\n', zastąp go '\0'
+	addi	t0, t0, 1 # Przejdź do następnego znaku
+	j	edit_fname_loop
+edit_fname_replace:
+	sb	zero, 0(t0)  # Zamień znak na '\0'
+	addi	t0, t0, 1 # Przejdź do następnego znaku
+	j	edit_fname_loop
+	edit_fname_done:
+
+	addi	sp, sp, 4
+	jr	ra
+	
 # ============================================================================
 process_image:
 #description: 
@@ -62,8 +112,7 @@ inner_loop:
 	add	s1, s1, a0
 	beqz	a0, after_print_result
 	mv	t0, a0
-	mv	a0, s0
-	add	a0, a0, t0 
+	mv	a0, s0 
 	mv	a1, s1
 	jal	print_found_marker
 after_print_result:
@@ -106,8 +155,8 @@ outer_loop_end:
 print_found_marker:
 #description: 
 #	prints coordinates of a given marker, (0, 0) - upper left corner
-#	a1 - x coordinate
-#	a2 - y coordinate - (0,0) - bottom left corner
+#	a0 - x coordinate
+#	a1 - y coordinate - (0,0) - bottom left corner
 #return value: none
 	addi	sp, sp, -4
 	sw	ra, 0(sp)
@@ -124,9 +173,12 @@ print_found_marker:
 	ecall
 	li	a7, 11
 	li	a0, ' '
-	ecall	
+	ecall
+	# print y cord
 	li	a7, 1
-	mv	a0, t1
+	li	a0, IMAGE_HEIGHT
+	addi	a0, a0, -1
+	sub	a0, a0, t1
 	ecall
 	li	a7, 11
 	li	a0, 10
